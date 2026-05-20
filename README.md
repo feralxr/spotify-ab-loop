@@ -1,33 +1,65 @@
+<div align="center">
+
 # Spotify A-B Loop
 
-A lightweight patcher for the **Spotify Windows desktop client** that adds an **A-B loop** feature — set a start and end point on any track and Spotify will loop that section indefinitely.
+**Precision loop any section of a Spotify track between two points.**  
+Built directly into the desktop client — no Spicetify, no frameworks, no BS.
 
-Works by injecting a JavaScript file directly into Spotify's bundled web app (`xpui.spa`), the same technique used by [SpotX](https://github.com/SpotX-Official/SpotX) and [BlockTheSpot](https://github.com/mrpond/BlockTheSpot). No third-party frameworks required.
 
-> **Tested on:** Spotify `1.2.83.461` · Windows 11 x64
+![Player Bar](screenshots/player-bar.png)
+
+</div>
 
 ---
 
-## Preview
+## What it does
 
-The A-B loop controls appear inline in the player bar, right after the repeat button:
+Sets a start point **A** and an end point **B** on any track. When playback reaches B, it instantly seeks back to A — looping that section indefinitely. Works while Spotify is in the background, minimized, or when you're on another app.
 
-```
-[shuffle] [prev] [play] [next] [repeat]  A  B  ✕  loop  1:04 – 2:31
-```
 
-- **A / B** buttons turn green when a point is set
-- **loop** turns green with a tinted background when active
-- Timestamp label shows your current loop range
-- All styling matches Spotify's native design tokens (SpotifyMixUI font, `#1ed760` green, Spotify easing curves)
+![Controls](screenshots/controls.png)
+
+The loop triggers with **sub-16ms precision** — not by polling a 1-second position tick like naive implementations. Position is tracked using a real-time clock anchored to Spotify's internal state, then extrapolated using `performance.now()` between syncs. When Spotify reports a new position, the clock only resyncs if the drift exceeds 1.5 seconds (indicating a genuine seek), keeping the interpolation smooth and the loop point razor-sharp.
+
+---
+
+## Features
+
+- **A-B loop** with precise timing — triggers within ~16ms of point B
+- **Per-track persistence** — loop points and saved slots restore automatically when you return to a track
+- **5 saved loop slots** per track — save, load, and delete named loop regions
+- **Fine-tune nudge** — adjust A or B by ±1 second after setting
+- **Speed control** — 0.5× / 0.75× / 1× / 1.25× / 1.5× playback rate
+- **Fade on loop** — 500ms crossfade when jumping back to A
+- **Loop counter** — tracks how many times the loop has fired
+- **Background-safe** — uses `requestAnimationFrame` when focused, falls back to a dedicated interval when the window is hidden, with an extended 1500ms lookahead to compensate for browser timer throttling
+- **Keyboard shortcuts** — set points and toggle loop without touching the mouse
+- **Progress bar overlay** — visual A-B region highlighted on the seek bar
+- **Seek detection** — if you scrub outside the A-B range while looping, the loop automatically pauses
+
+
+![Panel](screenshots/panel.png)
+
+---
+
+## Keyboard shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| `Alt + A` | Set loop start (A) at current position |
+| `Alt + B` | Set loop end (B) at current position |
+| `Alt + L` | Toggle loop on / off |
+| `Alt + C` | Clear A and B points |
+| `Alt + P` | Open / close the settings panel |
 
 ---
 
 ## Requirements
 
-- Spotify for Windows (downloaded from [spotify.com](https://spotify.com/download), **not** the Microsoft Store version)
+- Spotify for Windows, downloaded from [spotify.com](https://spotify.com/download)
+- **Not** the Microsoft Store version
 - Windows 10 or 11
-- PowerShell 5.1 or later (built into Windows)
+- PowerShell 5.1+ (built into Windows)
 
 ---
 
@@ -35,100 +67,92 @@ The A-B loop controls appear inline in the player bar, right after the repeat bu
 
 ### 1. Download
 
-Download these two files and place them in the **same folder**:
-
-- `install.ps1`
-- `ab-loop.js`
+Put `install.ps1` and `ab-loop.js` in the same folder.
 
 ### 2. Unblock the script
 
-Windows marks downloaded PowerShell scripts as untrusted. Open PowerShell in your download folder and run:
+Windows marks downloaded scripts as untrusted. Open PowerShell in that folder and run:
 
 ```powershell
 Unblock-File .\install.ps1
 ```
 
-### 3. Allow local scripts to run (one-time)
+### 3. Allow local scripts (one-time)
 
 ```powershell
 Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 ```
 
-Press `Y` to confirm.
+Press `Y`.
 
-### 4. Run the installer
+### 4. Run
 
 ```powershell
 .\install.ps1
 ```
 
-The installer will:
-1. Stop Spotify if it's running
-2. Back up `xpui.spa` → `xpui.spa.bak`
-3. Inject `ab-loop.js` into the Spotify app bundle
-4. Patch `index.html` to load it
+The installer stops Spotify, backs up `xpui.spa`, injects `ab-loop.js`, and patches `index.html`. Takes about two seconds.
 
 ### 5. Launch Spotify
 
-Start Spotify normally. The **A B ✕ loop** controls will appear in the player bar within a few seconds of the player loading.
+The **A B × loop ···** controls appear in the player bar within a few seconds of the player loading.
 
 ---
 
 ## Usage
 
-| Button | Action |
-|--------|--------|
-| **A** | Mark the current playback position as the **loop start** |
-| **B** | Mark the current playback position as the **loop end** |
-| **✕** | Clear both points and stop looping |
-| **loop** | Toggle the A-B loop on/off |
+### Basic loop
 
-**Workflow:**
-1. Play a track and let it reach your desired start point
+1. Play a track and reach your desired start point
 2. Click **A** — it turns green
-3. Let the track play to your desired end point
+3. Play forward to your desired end point
 4. Click **B** — it turns green
-5. Click **loop** — it turns green and the loop activates
-6. Spotify will now jump back to A every time it reaches B
+5. Click **loop** — turns green, loop activates
 
-> **Tip:** You can click A or B again at any time to update the points while the loop is active. Clicking ✕ clears everything and stops the loop.
+The label between the buttons shows your range: `2:14 – 2:24`
+
+### Settings panel
+
+Click **···** to open the floating panel on the right side of the screen.
+
+![Panel annotated](screenshots/panel-annotated.png)
+
+**Loop Region** — your A and B timestamps with large readable time values. Use `-1s` / `+1s` to nudge either point with precision after setting.
+
+**Settings** — cycle playback speed, toggle the 500ms fade crossfade on loop, and see the live loop counter.
+
+**Saved Loops** — save up to 5 loop regions per track. Points are stored in `localStorage` keyed by track title and artist, so they persist across sessions and restore automatically.
+
+### Saved loops
+
+- Click a slot row to **load** it
+- Hover a row and click **save** to save current A/B to that slot
+- Hover a row and click **del** to delete it
+- Active slot shown in green with an `active` badge
 
 ---
 
-## Uninstallation
+## After a Spotify update
 
-Run the uninstaller to restore Spotify to its original state:
+Updates overwrite `xpui.spa`. Re-run `install.ps1` to re-apply the patch.
+
+---
+
+## Uninstall
 
 ```powershell
 .\uninstall.ps1
 ```
 
-This restores `xpui.spa` from the backup created during installation.
-
-**Manual uninstall:** Navigate to `%AppData%\Spotify\Apps\` and rename `xpui.spa.bak` back to `xpui.spa`.
-
----
-
-## After a Spotify Update
-
-Spotify updates overwrite `xpui.spa`, removing the patch. To re-apply:
-
-1. Close Spotify
-2. Re-run `install.ps1`
-
-The installer detects an existing backup and skips re-creating it. If Spotify updated, delete the old `xpui.spa.bak` first so a fresh backup is made.
+Restores the original `xpui.spa` from the backup. Or manually rename `%AppData%\Spotify\Apps\xpui.spa.bak` → `xpui.spa`.
 
 ---
 
 ## Enabling DevTools (optional)
 
-If you want to inspect the injected script or debug issues, you can enable Spotify's built-in DevTools (`Ctrl+Shift+I`).
-
-Close Spotify, then run these commands in PowerShell:
+Useful for debugging. Close Spotify, then run:
 
 ```powershell
-Get-Process -Name Spotify -ErrorAction SilentlyContinue | Stop-Process -Force
-
 $f = "$env:LOCALAPPDATA\Spotify\offline.bnk"
 $enc = [System.Text.Encoding]::GetEncoding(1251)
 $c = [System.IO.File]::ReadAllText($f, $enc)
@@ -137,79 +161,76 @@ $c = $c -replace '(app-developer..)(2|1|0)', '${1}2'
 [System.IO.File]::WriteAllText($f, $c, $enc)
 ```
 
-Launch Spotify and press `Ctrl+Shift+I`.
+Launch Spotify → `Ctrl+Shift+I`.
 
-> **Note:** Spotify resets this setting periodically. Re-run the commands whenever you need DevTools again.
+> Spotify resets this on each launch. Re-run when needed.
 
 ---
 
-## How It Works
+## How it works
 
-Spotify's desktop client is an [Electron](https://www.electronjs.org/) app that bundles its entire frontend (React + webpack) into a ZIP archive at:
+### Patching
+
+Spotify's desktop client is Electron. Its entire frontend — React, webpack bundles, everything — lives inside a ZIP at `%AppData%\Spotify\Apps\xpui.spa`. The installer:
+
+1. Opens `xpui.spa` as a ZIP using .NET's `System.IO.Compression`
+2. Adds `ab-loop.js` as a new entry
+3. Patches `index.html` inside the ZIP to load it via `<script defer>`
+
+No binary patching. No registry edits. No network calls.
+
+### Loop precision
+
+Most A-B loop implementations poll `currentTime` on an interval and trigger when `pos >= B`. The problem: Spotify's internal position counter only updates every **~1000ms**. A naive implementation either fires up to 1 second early (large lookahead) or misses B entirely (small lookahead).
+
+This implementation uses a **real-time interpolated clock**:
 
 ```
-%AppData%\Spotify\Apps\xpui.spa
+1. Spotify gives us a position update (every ~1s)
+2. We record: anchorPos = raw, anchorT = performance.now()
+3. Between updates: estimatedPos = anchorPos + (performance.now() - anchorT)
+4. On normal 1s ticks, we don't reset anchorT — only correct anchorPos
+5. This gives smooth sub-ms position tracking at rAF speed (~16ms)
 ```
 
-The installer:
-1. Opens `xpui.spa` as a ZIP file using .NET's `System.IO.Compression`
-2. Adds `ab-loop.js` as a new entry inside the ZIP
-3. Patches `index.html` (also inside the ZIP) to load it via a `<script>` tag
+When position reaches `B - 150ms` (foreground) or `B - 1500ms` (background), `seekTo` fires. Spotify's seek takes ~100-150ms to land, so the loop point is hit with ~0ms audible error in practice.
 
-At runtime, `ab-loop.js`:
-- Waits for Spotify's React player to mount via `MutationObserver`
-- Injects the A/B loop UI into the controls row using `position: grid` to preserve centering
-- Reads playback position from the progress bar's React fiber props (`props.value` in ms)
-- Seeks by calling `props.onDragEnd(fraction, { wasDraggedBeforeReleased: false })` — the same internal handler Spotify uses when you drag the scrubber
-- Polls every 150ms and seeks to A when position reaches B - 300ms
+### Seek detection
+
+The clock monitors for drift between predicted and actual position. A diff > 1500ms means the user seeked manually. On a detected seek:
+- Clock hard-resets to the new position
+- If the new position is outside A-B and loop is active, loop pauses automatically
+
+### Background safety
+
+When Spotify is not the focused window, Chrome/Electron throttles `requestAnimationFrame` to ~1fps or stops it entirely. The implementation runs a parallel `setInterval` at 500ms that activates when `document.hidden` is true, with a wider lookahead to compensate for the coarser timing.
 
 ---
 
 ## Compatibility
 
-| Spotify Version | Status |
-|----------------|--------|
-| 1.2.83.x | ✅ Tested and working |
+| Version | Status |
+|---------|--------|
+| 1.2.83.x | ✅ Tested |
 | 1.2.6x – 1.2.8x | ✅ Should work |
-| Microsoft Store version | ❌ Not supported |
-
-> Versions below 1.2.62 have a different `xpui.spa` structure and may need minor adjustments.
+| Microsoft Store | ❌ Not supported |
 
 ---
 
 ## Troubleshooting
 
-**Buttons don't appear after launching Spotify**
-- Wait 5–10 seconds for the player to fully load
-- Try playing a track first, then check if the buttons appear
-- Re-run `install.ps1` to ensure the patch is applied
+**Buttons don't appear after launch** — wait 5–10 seconds, or play a track first.
 
-**A/B buttons don't respond**
-- Make sure a track is actively playing (not paused before starting)
-- Open DevTools (`Ctrl+Shift+I` after enabling) and check the Console for `[AB Loop]` errors
+**Loop fires slightly early/late** — this is the 150ms pre-seek lookahead. It's intentional: Spotify's seek takes ~100–150ms to land, so triggering early means the audio hits point B precisely. If your setup has different latency, the value is a single constant in `ab-loop.js` — search for `150`.
 
-**Loop triggers slightly early**
-- This is by design — the loop fires 300ms before point B to compensate for polling lag
-- If the timing feels off, this value can be adjusted in `ab-loop.js` (search for `300`)
+**Saved loops not restoring** — check that the track title and artist are the same (the storage key is `title__artist`). Compilations or tracks with featuring artists may have slightly different metadata between plays.
 
-**Spotify updated and the patch is gone**
-- Re-run `install.ps1`
-
-**`xpui.spa` not found**
-- Make sure you installed Spotify from [spotify.com](https://spotify.com/download), not the Microsoft Store
-
----
-
-## Contributing
-
-Issues and PRs welcome. If Spotify updates and breaks something, the most useful thing to share is:
-- Your Spotify version (`Help → About Spotify`)
-- The output of the debug snippet from the DevTools console
+**Spotify updated, patch is gone** — re-run `install.ps1`.
 
 ---
 
 ## Disclaimer
 
-This project is not affiliated with or endorsed by Spotify. Modifying the Spotify client may violate Spotify's [Terms of Service](https://www.spotify.com/legal/end-user-agreement/). Use at your own risk.
+Not affiliated with Spotify. Modifying the client may violate Spotify's [Terms of Service](https://www.spotify.com/legal/end-user-agreement/). Use at your own risk.
 
-This patcher does not bypass any DRM, remove ads, unlock premium features, or make any network requests. It only adds a local UI feature on top of the existing client.
+This tool makes no network requests, bypasses no DRM, removes no ads, and unlocks no premium features. It adds a single local JavaScript file that runs client-side only.
